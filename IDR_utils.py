@@ -50,7 +50,7 @@ def IDR_TargetGetter(CompoundsOfInterest, idx_file=None):
     print('No. of targets identified = ',len(Targets))
     
     return Targets
-#  Targets = [{plate, Well, Compound}]
+#  Targets = [{Plate, Well, Compound Name}]
 
 
 # In[3]:
