@@ -22,6 +22,7 @@ from im_segment import im_segment
 import pandas as pd
 from Pad_n_Save import Pad_n_Save
 from pathvalidate import sanitize_filename
+import pickle
 
 def StarDist_Segment_loop (GPU_id, compound_selection):
 
@@ -38,10 +39,17 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
 
     idx_file = './idr0016-screenA-annotation.csv'
-    df = pd.read_csv (idx_file)
-    Comp_names =  df['Compound Name']
-    unique_Comp_names = Comp_names.unique()
-    Comp_Avail = [name for name in unique_Comp_names if (type(name)==str and len(name)>0 and name!='DMSO')]
+    # df = pd.read_csv (idx_file)
+    # Comp_names =  df['Compound Name']
+    # unique_Comp_names = Comp_names.unique()
+    # Comp_Avail = [name for name in unique_Comp_names if (type(name)==str and len(name)>0 and name!='DMSO')]
+    
+    with open('tmp_Selected10Classes.pkl','rb') as f:
+        selected_classes = pickle.load(f)
+    Comp_Avail=selected_classes#+['Cdk2/5 inhibitor','mammea A/BA'] #['chlorphenamine','paracetamol']
+    # Comp_Avail.remove('Cdk25 inhibitor')
+    # Comp_Avail.remove('mammea ABA')
+    
     print('No. of compounds available =',len(Comp_Avail))
     CompoundsOfInterest = Comp_Avail[compound_selection]
     print('No. of compounds selected =',len(CompoundsOfInterest))
@@ -59,7 +67,7 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     # Local source of images or path where images will be downloaded
     # Local_ImgPath = os.path.abspath(r'/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/RawImages')
-    Local_ImgPath = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\RawImages')
+    Local_ImgPath = os.path.abspath(r'/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/RawImages_5Ch')
 
     # idx_file = None # Use None to download the idx_file from IDR's github
     idx_file = idx_file
@@ -95,7 +103,7 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
 
     delete_existing_folders = False
-    Master_SaveDir_of_SegmentedImg = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/Segmented_SmallMol')
+    Master_SaveDir_of_SegmentedImg = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/FullFields_5Ch')
     # Master_SaveDir_of_SegmentedImg = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\Segmented_SmallMol')
 
     if delete_existing_folders:
@@ -109,8 +117,8 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     assert len(ChannelOfInterest) == 1, "ChannelOfInterest should contain only one value prior to segmentation"
 
-    # Master_SaveDir_of_SegmentedImg = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/Segmented_SmallMol')
-    Master_SaveDir_of_SegmentedImg = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\Segmented_SmallMol')
+    Master_SaveDir_of_SegmentedImg = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/FullFields_5Ch')
+    # Master_SaveDir_of_SegmentedImg = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\Segmented_SmallMol')
 
     SaveDir_of_SegmentedImg_dict = {}
     for CompoundOfInterest in CompoundsOfInterest:
@@ -131,19 +139,40 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     # Generating list of files to be imported for segmentation
     SourcePaths = []
+    SourcePaths_1 = []
+    SourcePaths_2 = []
+    SourcePaths_3 = []
+    SourcePaths_4 = []
     ImportDetails = []  # will be useful for naming crops later
     for CompoundOfInterest in CompoundsOfInterest:
         Targets = Targets_dict[CompoundOfInterest]
         for Target in Targets:
             source_folder = os.path.abspath(os.path.join(Local_ImgPath,f"{Target['Plate']}-{ChannelOfInterest[0]}"))
+            source_folder_1 = os.path.abspath(os.path.join(Local_ImgPath,f"{Target['Plate']}-ERSyto"))
+            source_folder_2 = os.path.abspath(os.path.join(Local_ImgPath,f"{Target['Plate']}-ERSytoBleed"))
+            source_folder_3 = os.path.abspath(os.path.join(Local_ImgPath,f"{Target['Plate']}-Ph_golgi"))
+            source_folder_4 = os.path.abspath(os.path.join(Local_ImgPath,f"{Target['Plate']}-Mito"))
             Well = Target['Well'].lower()
             if len(Well)<3:
                 Well = str(Well[0]+'0'+Well[1])
             Well = str('_'+Well+'_')
-            files = [file for file in os.listdir(source_folder) if Well in file]
-            for file in files:
-                SourcePaths.append(os.path.abspath(os.path.join(source_folder,file))) 
-                ImportDetails.append({'Plate':Target['Plate'], 'Well':Well, 'File':file, 'Compound Name':Target['Compound Name']})
+            files = [file_ for file_ in os.listdir(source_folder) if Well in file_]
+            files_1 = [file_ for file_ in os.listdir(source_folder_1) if Well in file_]
+            files_2 = [file_ for file_ in os.listdir(source_folder_2) if Well in file_]
+            files_3 = [file_ for file_ in os.listdir(source_folder_3) if Well in file_]
+            files_4 = [file_ for file_ in os.listdir(source_folder_4) if Well in file_]
+
+            for file_ in files:
+                SourcePaths.append(os.path.abspath(os.path.join(source_folder,file_))) 
+                ImportDetails.append({'Plate':Target['Plate'], 'Well':Well, 'File':file_, 'Compound Name':Target['Compound Name']})
+            for file_ in files_1:
+                SourcePaths_1.append(os.path.abspath(os.path.join(source_folder_1,file_))) 
+            for file_ in files_2:
+                SourcePaths_2.append(os.path.abspath(os.path.join(source_folder_2,file_)))
+            for file_ in files_3:
+                SourcePaths_3.append(os.path.abspath(os.path.join(source_folder_3,file_))) 
+            for file_ in files_4:
+                SourcePaths_4.append(os.path.abspath(os.path.join(source_folder_4,file_)))  
 
     print('No. of files to be segmented = ', str(len(SourcePaths)))
 
@@ -152,7 +181,8 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
 
     # Clearing memory
-    del Targets, TargetPlates, ExistingPlates, plates2remove, dwnld_args, source_folder, Well, files, file
+    del Targets, TargetPlates, ExistingPlates, plates2remove, dwnld_args, source_folder, Well, files, file_
+    del source_folder_1, files_1, source_folder_2, files_2, source_folder_3, files_3, source_folder_4, files_4
     del Targets_dict, dwnld_args_dict, SaveDir_of_SegmentedImg_dict
 
 
@@ -161,7 +191,15 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
     # In[10]:
 
 
-    X_Paths = SourcePaths
+    X_Paths = sorted(SourcePaths)
+    X_Paths_1 = sorted(SourcePaths_1)
+    X_Paths_2 = sorted(SourcePaths_2)
+    X_Paths_3 = sorted(SourcePaths_3)
+    X_Paths_4 = sorted(SourcePaths_4)
+
+    sorted_pairs = zip(*sorted(zip(SourcePaths, ImportDetails)))
+    _, ImportDetails = [ list(tup) for tup in sorted_pairs]
+
     Segmented_dir = Master_SaveDir_of_SegmentedImg
     print('No. of files to be segmented = ', str(len(SourcePaths)))
     print('\n1st file_path :\n', X_Paths[0])
@@ -169,6 +207,10 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     with mp.Pool() as pool:
         X = pool.map(ImportImg.Import_GrayImg,[path for path in X_Paths])
+        X_1 = pool.map(ImportImg.Import_GrayImg,[path for path in X_Paths_1])
+        X_2 = pool.map(ImportImg.Import_GrayImg,[path for path in X_Paths_2])
+        X_3 = pool.map(ImportImg.Import_GrayImg,[path for path in X_Paths_3])
+        X_4 = pool.map(ImportImg.Import_GrayImg,[path for path in X_Paths_4])
 
     plt.figure(figsize=(8,5))
     plt.imshow(X[0],cmap='gray', norm=matplotlib.colors.Normalize());   plt.axis('off'); plt.title('Source image')
@@ -178,7 +220,7 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
 
     # Clearing memory
-    del X_Paths, SourcePaths
+    del X_Paths, SourcePaths, X_Paths_1, SourcePaths_1, X_Paths_2, SourcePaths_2, X_Paths_3, SourcePaths_3, X_Paths_4, SourcePaths_4
 
 
     # # Defining weights to load
@@ -186,20 +228,20 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
     # In[12]:
 
 
-    Use_custom_model = True
+    # Use_custom_model = True
 
-    if Use_custom_model:
+    # if Use_custom_model:
     #     ModelDir = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/StarDist_Segmentation')
-        ModelDir = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\StarDist_Segmentation')
-        ModelName = 'stardist'
-        # Not used if Use_custom_model is set to flase. 
-        # The in-built 2D_versatile_fluo weights is then used
+    #     # ModelDir = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\StarDist_Segmentation')
+    #     ModelName = 'stardist'
+    #     # Not used if Use_custom_model is set to flase. 
+    #     # The in-built 2D_versatile_fluo weights is then used
 
-        model = StarDist2D(None, name=ModelName, basedir=ModelDir)
-        print('\nLoaded custom weights save in :\n',str(os.path.join(ModelDir,ModelName)))
-    else:
-        model = StarDist2D.from_pretrained('2D_versatile_fluo')
-        print("\nLoaded pretrained weights from in-built '2D_versatile_fluo'")
+    #     model = StarDist2D(None, name=ModelName, basedir=ModelDir)
+    #     print('\nLoaded custom weights save in :\n',str(os.path.join(ModelDir,ModelName)))
+    # else:
+    #     model = StarDist2D.from_pretrained('2D_versatile_fluo')
+    #     print("\nLoaded pretrained weights from in-built '2D_versatile_fluo'")
 
 
     # # Prediction
@@ -216,35 +258,35 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     # label, detail = model.predict_instances(x)
 
-    predictions = [model.predict_instances(x) for x in X]
-    Labels ,details = map(list,zip(*predictions))
+    # predictions = [model.predict_instances(x) for x in X]
+    # Labels ,details = map(list,zip(*predictions))
 
 
     # In[14]:
 
 
     # Displaying the first image as example
-    plt.figure(figsize=(20,15))
-    plt.subplot(2,2,1); plt.imshow(X[0],cmap='gray', norm=matplotlib.colors.Normalize());   plt.axis('off'); plt.title('Source image')
-    plt.subplot(2,2,2);
-    img = X[0] if X[0].ndim==2 else X[0][...,0]
-    coord, points, prob = details[0]['coord'], details[0]['points'], details[0]['prob']
-    plt.imshow(img, cmap='gray'); plt.axis('off')
-    a = plt.axis()
-    _draw_polygons(coord, points, prob, show_dist=True)
-    plt.axis(a)
+    # plt.figure(figsize=(20,15))
+    # plt.subplot(2,2,1); plt.imshow(X[0],cmap='gray', norm=matplotlib.colors.Normalize());   plt.axis('off'); plt.title('Source image')
+    # plt.subplot(2,2,2);
+    # img = X[0] if X[0].ndim==2 else X[0][...,0]
+    # coord, points, prob = details[0]['coord'], details[0]['points'], details[0]['prob']
+    # plt.imshow(img, cmap='gray'); plt.axis('off')
+    # a = plt.axis()
+    # _draw_polygons(coord, points, prob, show_dist=True)
+    # plt.axis(a)
 
-    plt.subplot(2,2,3); plt.imshow(Labels[0],cmap=lbl_cmap, norm=matplotlib.colors.Normalize());   plt.axis('off'); plt.title('Predictions')
-    plt.subplot(2,2,4); plt.title('Overlay'); plt.axis('off');
-    plt.imshow(X[0] if X[0].ndim==2 else X[0][...,0], clim=(0,1), cmap='gray', norm=matplotlib.colors.Normalize())
-    plt.imshow(Labels[0], cmap=lbl_cmap, norm=matplotlib.colors.Normalize(), alpha=0.2)
+    # plt.subplot(2,2,3); plt.imshow(Labels[0],cmap=lbl_cmap, norm=matplotlib.colors.Normalize());   plt.axis('off'); plt.title('Predictions')
+    # plt.subplot(2,2,4); plt.title('Overlay'); plt.axis('off');
+    # plt.imshow(X[0] if X[0].ndim==2 else X[0][...,0], clim=(0,1), cmap='gray', norm=matplotlib.colors.Normalize())
+    # plt.imshow(Labels[0], cmap=lbl_cmap, norm=matplotlib.colors.Normalize(), alpha=0.2)
 
 
     # In[15]:
 
 
     # clearing memory
-    del predictions, details
+    # del predictions, details
 
 
     # # Segmentation
@@ -252,24 +294,26 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
     # In[16]:
 
 
-    with mp.Pool() as pool:
-        Labels = pool.map(im_ClearBorder,Labels)
+    # with mp.Pool() as pool:
+    #     Labels = pool.map(im_ClearBorder,Labels)
 
 
     # In[17]:
 
 
-    with mp.Pool() as pool:  
-        Crops = pool.starmap(im_segment,zip(Labels,X))
+    # with mp.Pool() as pool:  
+    #     Crops = pool.starmap(im_segment,zip(Labels,X))
+    #     Crops_1 = pool.starmap(im_segment,zip(Labels,X_1))
+    #     Crops_2 = pool.starmap(im_segment,zip(Labels,X_2))
 
 
     # In[18]:
 
 
-    if type(Crops[0])==np.ndarray:
-        plt.imshow(Crops[0], cmap='gray', norm=matplotlib.colors.Normalize()); plt.axis('off'); plt.title('Crop example')
-    else:
-        plt.imshow(Crops[0][0], cmap='gray', norm=matplotlib.colors.Normalize()); plt.axis('off'); plt.title('Crop example')
+    # if type(Crops[0])==np.ndarray:
+    #     plt.imshow(Crops[0], cmap='gray', norm=matplotlib.colors.Normalize()); plt.axis('off'); plt.title('Crop example')
+    # else:
+    #     plt.imshow(Crops[0][0], cmap='gray', norm=matplotlib.colors.Normalize()); plt.axis('off'); plt.title('Crop example')
 
 
 
@@ -277,7 +321,7 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
 
     # clearing memory
-    del Labels, X
+    # del Labels, X, X_1, X_2
 
 
     # # Saving the segments
@@ -287,11 +331,16 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     # Defining save_paths
 
-    assert len(Crops)==len(ImportDetails), 'Output is inconsistent with number of input files!'
+    assert len(X)==len(ImportDetails), 'Output is inconsistent with number of input files!'
+    assert len(X)==len(X_1), 'Length of X has to be same as X_1!'
+    assert len(X_1)==len(X_2), 'Length of X_1 has to be same as X_2!'
+    assert len(X_2)==len(X_3), 'Length of X_2 has to be same as X_3!'
+    assert len(X_3)==len(X_4), 'Length of X_3 has to be same as X_4!'
+
     save_paths = []
     EmptyImgs=[]
     EmptyIdx=[]
-    for I,single_source in enumerate(Crops):
+    for I,single_source in enumerate(X):
         if type(single_source)!=type(None):
             source_info = ImportDetails[I]
             filename = source_info['File']
@@ -299,8 +348,8 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
             field = field[:field.find('_')]
             save_paths.extend([os.path.abspath(os.path.join(
                 Segmented_dir,sanitize_filename(source_info['Compound Name']),
-                sanitize_filename(f"{source_info['Plate']}{source_info['Well']}{field}_{i}_{source_info['Compound Name']}.tif")
-            )) for i in range(len(single_source))])
+                sanitize_filename(f"{source_info['Plate']}{source_info['Well']}{field}_{source_info['Compound Name']}.tif")
+            ))])
         else:
             EmptyIdx.append(I)
             source_info = ImportDetails[I]
@@ -310,30 +359,35 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
                 source_info['File']
             )))
 
-    Crops=np.delete(Crops,EmptyIdx)
-    ImportDetails=np.delete(ImportDetails,EmptyIdx)
+    # Crops=np.delete(Crops,EmptyIdx)
+    # Crops_1=np.delete(Crops_1,EmptyIdx)
+    # Crops_2=np.delete(Crops_2,EmptyIdx)
+    # ImportDetails=np.delete(ImportDetails,EmptyIdx)
 
-    print('\nNo. of empty images = ',str(len(EmptyImgs)))        
-    print('Empty paths :')
-    for path in EmptyImgs: print(path)
+    # print('\nNo. of empty images = ',str(len(EmptyImgs)))        
+    # print('Empty paths :')
+    # for path in EmptyImgs: print(path)
 
-    print('No. of save paths = ',str(len(save_paths)))
-    print('1st save path :\n',save_paths[0])
+    # print('No. of save paths = ',str(len(save_paths)))
+    # print('1st save path :\n',save_paths[0])
 
 
     # In[21]:
 
 
     # Restructuring Crops such that each element is an image rather than a list of images
-    Crops = [crop for single_source in Crops for crop in single_source]
-    print('No. of crops = ',str(len(Crops)))
+    # Crops = [crop for single_source in Crops for crop in single_source]
+    # Crops_1 = [crop for single_source in Crops_1 for crop in single_source]
+    # Crops_2 = [crop for single_source in Crops_2 for crop in single_source]
+    # print('No. of crops = ',str(len(Crops)))
 
+    Crops_5Ch = [np.dstack(img) for img in zip(X,X_1,X_2,X_3,X_4)]
+    Crops = Crops_5Ch
 
     # In[59]:
 
-
     # saving the segments
-    img_size=(64,64) # desired image size. Use None to skip padding and save with original size
+    img_size=None#(64,64) # desired image size. Use None to skip padding and save with original size
 
     assert len(Crops)==len(save_paths), 'No. of crops is inconsistent with number of save paths!'
     with mp.Pool() as pool:

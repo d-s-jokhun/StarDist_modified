@@ -7,6 +7,8 @@
 import numpy as np
 import cv2
 import math
+# import os
+import tifffile
 
 
 # In[55]:
@@ -46,8 +48,32 @@ def Pad_n_Save (save_path, img, ImgSize=None):
         elif len(img.shape) == 3:
             img = np.pad(img,((height_start,height_end),(width_start,width_end),(0,0)))
 
-        cv2.imwrite(save_path,img)
-    
+        # cv2.imwrite(save_path,img)
+        tifffile.imsave(save_path,img,photometric='minisblack', planarconfig='contig')
+
+        # img_0 = img[:,:,0]
+        # img_1 = img[:,:,1]
+        # img_2 = img[:,:,2]
+
+        # path_0 = os.path.basename(save_path).split('_')
+        # path_0.insert(-1, 'Ch0')
+        # path_0 = '_'.join(path_0)
+        # save_path_0 = os.path.join(os.path.dirname(save_path),path_0)
+
+        # path_1 = os.path.basename(save_path).split('_')
+        # path_1.insert(-1, 'Ch1')
+        # path_1 = '_'.join(path_1)
+        # save_path_1 = os.path.join(os.path.dirname(save_path),path_1)
+
+        # path_2 = os.path.basename(save_path).split('_')
+        # path_2.insert(-1, 'Ch2')
+        # path_2 = '_'.join(path_2)
+        # save_path_2 = os.path.join(os.path.dirname(save_path),path_2)
+
+        # cv2.imwrite(save_path_0,img_0)
+        # cv2.imwrite(save_path_1,img_1)
+        # cv2.imwrite(save_path_2,img_2)
+       
     return
 
 

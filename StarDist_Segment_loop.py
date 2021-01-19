@@ -22,6 +22,7 @@ from im_segment import im_segment
 import pandas as pd
 from Pad_n_Save import Pad_n_Save
 from pathvalidate import sanitize_filename
+import pickle
 
 def StarDist_Segment_loop (GPU_id, compound_selection):
 
@@ -38,10 +39,17 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
 
     idx_file = './idr0016-screenA-annotation.csv'
-    df = pd.read_csv (idx_file)
-    Comp_names =  df['Compound Name']
-    unique_Comp_names = Comp_names.unique()
-    Comp_Avail = [name for name in unique_Comp_names if (type(name)==str and len(name)>0 and name!='DMSO')]
+    # df = pd.read_csv (idx_file)
+    # Comp_names =  df['Compound Name']
+    # unique_Comp_names = Comp_names.unique()
+    # Comp_Avail = [name for name in unique_Comp_names if (type(name)==str and len(name)>0 and name!='DMSO')]
+    
+    with open('tmp_selected_classes.pkl','rb') as f:
+        selected_classes = pickle.load(f)
+    Comp_Avail=selected_classes+['Cdk2/5 inhibitor','mammea A/BA']#['chlorphenamine','paracetamol']
+    Comp_Avail.remove('Cdk25 inhibitor')
+    Comp_Avail.remove('mammea ABA')
+    
     print('No. of compounds available =',len(Comp_Avail))
     CompoundsOfInterest = Comp_Avail[compound_selection]
     print('No. of compounds selected =',len(CompoundsOfInterest))
@@ -59,7 +67,7 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     # Local source of images or path where images will be downloaded
     # Local_ImgPath = os.path.abspath(r'/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/RawImages')
-    Local_ImgPath = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\RawImages')
+    Local_ImgPath = os.path.abspath(r'/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/RawImages_3Ch')
 
     # idx_file = None # Use None to download the idx_file from IDR's github
     idx_file = idx_file
@@ -95,7 +103,7 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
 
     delete_existing_folders = False
-    Master_SaveDir_of_SegmentedImg = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/Segmented_SmallMol')
+    Master_SaveDir_of_SegmentedImg = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/seg')
     # Master_SaveDir_of_SegmentedImg = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\Segmented_SmallMol')
 
     if delete_existing_folders:
@@ -109,8 +117,8 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     assert len(ChannelOfInterest) == 1, "ChannelOfInterest should contain only one value prior to segmentation"
 
-    # Master_SaveDir_of_SegmentedImg = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/Segmented_SmallMol')
-    Master_SaveDir_of_SegmentedImg = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\Segmented_SmallMol')
+    Master_SaveDir_of_SegmentedImg = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/seg')
+    # Master_SaveDir_of_SegmentedImg = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\Segmented_SmallMol')
 
     SaveDir_of_SegmentedImg_dict = {}
     for CompoundOfInterest in CompoundsOfInterest:
@@ -131,19 +139,30 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     # Generating list of files to be imported for segmentation
     SourcePaths = []
+    SourcePaths_1 = []
+    SourcePaths_2 = []
     ImportDetails = []  # will be useful for naming crops later
     for CompoundOfInterest in CompoundsOfInterest:
         Targets = Targets_dict[CompoundOfInterest]
         for Target in Targets:
             source_folder = os.path.abspath(os.path.join(Local_ImgPath,f"{Target['Plate']}-{ChannelOfInterest[0]}"))
+            source_folder_1 = os.path.abspath(os.path.join(Local_ImgPath,f"{Target['Plate']}-ERSytoBleed"))
+            source_folder_2 = os.path.abspath(os.path.join(Local_ImgPath,f"{Target['Plate']}-Ph_golgi"))
             Well = Target['Well'].lower()
             if len(Well)<3:
                 Well = str(Well[0]+'0'+Well[1])
             Well = str('_'+Well+'_')
-            files = [file for file in os.listdir(source_folder) if Well in file]
-            for file in files:
-                SourcePaths.append(os.path.abspath(os.path.join(source_folder,file))) 
-                ImportDetails.append({'Plate':Target['Plate'], 'Well':Well, 'File':file, 'Compound Name':Target['Compound Name']})
+            files = [file_ for file_ in os.listdir(source_folder) if Well in file_]
+            files_1 = [file_ for file_ in os.listdir(source_folder_1) if Well in file_]
+            files_2 = [file_ for file_ in os.listdir(source_folder_2) if Well in file_]
+
+            for file_ in files:
+                SourcePaths.append(os.path.abspath(os.path.join(source_folder,file_))) 
+                ImportDetails.append({'Plate':Target['Plate'], 'Well':Well, 'File':file_, 'Compound Name':Target['Compound Name']})
+            for file_ in files_1:
+                SourcePaths_1.append(os.path.abspath(os.path.join(source_folder_1,file_))) 
+            for file_ in files_2:
+                SourcePaths_2.append(os.path.abspath(os.path.join(source_folder_2,file_))) 
 
     print('No. of files to be segmented = ', str(len(SourcePaths)))
 
@@ -152,7 +171,8 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
 
     # Clearing memory
-    del Targets, TargetPlates, ExistingPlates, plates2remove, dwnld_args, source_folder, Well, files, file
+    del Targets, TargetPlates, ExistingPlates, plates2remove, dwnld_args, source_folder, Well, files, file_
+    del source_folder_1, files_1, source_folder_2, files_2
     del Targets_dict, dwnld_args_dict, SaveDir_of_SegmentedImg_dict
 
 
@@ -161,7 +181,13 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
     # In[10]:
 
 
-    X_Paths = SourcePaths
+    X_Paths = sorted(SourcePaths)
+    X_Paths_1 = sorted(SourcePaths_1)
+    X_Paths_2 = sorted(SourcePaths_2)
+
+    sorted_pairs = zip(*sorted(zip(SourcePaths, ImportDetails)))
+    _, ImportDetails = [ list(tup) for tup in sorted_pairs]
+
     Segmented_dir = Master_SaveDir_of_SegmentedImg
     print('No. of files to be segmented = ', str(len(SourcePaths)))
     print('\n1st file_path :\n', X_Paths[0])
@@ -169,6 +195,8 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     with mp.Pool() as pool:
         X = pool.map(ImportImg.Import_GrayImg,[path for path in X_Paths])
+        X_1 = pool.map(ImportImg.Import_GrayImg,[path for path in X_Paths_1])
+        X_2 = pool.map(ImportImg.Import_GrayImg,[path for path in X_Paths_2])
 
     plt.figure(figsize=(8,5))
     plt.imshow(X[0],cmap='gray', norm=matplotlib.colors.Normalize());   plt.axis('off'); plt.title('Source image')
@@ -178,7 +206,7 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
 
     # Clearing memory
-    del X_Paths, SourcePaths
+    del X_Paths, SourcePaths, X_Paths_1, SourcePaths_1, X_Paths_2, SourcePaths_2
 
 
     # # Defining weights to load
@@ -189,8 +217,8 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
     Use_custom_model = True
 
     if Use_custom_model:
-    #     ModelDir = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/StarDist_Segmentation')
-        ModelDir = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\StarDist_Segmentation')
+        ModelDir = os.path.abspath('/gpfs0/home/jokhun/Pro 1/U2OS small mol screening/StarDist_Segmentation')
+        # ModelDir = os.path.abspath(r'\\deptnas.nus.edu.sg\BIE\MBELab\jokhun\Pro 1\U2OS small mol screening\StarDist_Segmentation')
         ModelName = 'stardist'
         # Not used if Use_custom_model is set to flase. 
         # The in-built 2D_versatile_fluo weights is then used
@@ -261,6 +289,8 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     with mp.Pool() as pool:  
         Crops = pool.starmap(im_segment,zip(Labels,X))
+        Crops_1 = pool.starmap(im_segment,zip(Labels,X_1))
+        Crops_2 = pool.starmap(im_segment,zip(Labels,X_2))
 
 
     # In[18]:
@@ -277,7 +307,7 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
 
     # clearing memory
-    del Labels, X
+    del Labels, X, X_1, X_2
 
 
     # # Saving the segments
@@ -311,6 +341,8 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
             )))
 
     Crops=np.delete(Crops,EmptyIdx)
+    Crops_1=np.delete(Crops_1,EmptyIdx)
+    Crops_2=np.delete(Crops_2,EmptyIdx)
     ImportDetails=np.delete(ImportDetails,EmptyIdx)
 
     print('\nNo. of empty images = ',str(len(EmptyImgs)))        
@@ -326,11 +358,14 @@ def StarDist_Segment_loop (GPU_id, compound_selection):
 
     # Restructuring Crops such that each element is an image rather than a list of images
     Crops = [crop for single_source in Crops for crop in single_source]
+    Crops_1 = [crop for single_source in Crops_1 for crop in single_source]
+    Crops_2 = [crop for single_source in Crops_2 for crop in single_source]
     print('No. of crops = ',str(len(Crops)))
 
+    Crops_3Ch = [np.dstack(img) for img in zip(Crops,Crops_1,Crops_2)]
+    Crops = Crops_3Ch
 
     # In[59]:
-
 
     # saving the segments
     img_size=(64,64) # desired image size. Use None to skip padding and save with original size
